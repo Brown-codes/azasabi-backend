@@ -1,0 +1,15 @@
+# Secrets & Credentials
+.env
+
+# Environments
+venv/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDEs
+.vscode/
+.idea/
