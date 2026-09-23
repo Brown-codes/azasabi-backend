@@ -17,6 +17,7 @@ from app.core.database import Base
 from app.models.user import User
 from app.models.business import Business
 from app.models.sale import Sale
+from app.models.message import Message
 
 # 4. Set up the Alembic Config object
 config = context.config
