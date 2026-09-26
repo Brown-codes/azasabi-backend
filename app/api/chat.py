@@ -14,7 +14,7 @@ from app.services.ai import process_chat_message
 router = APIRouter(prefix="/chat", tags=["AI Chat"])
 
 class ChatRequest(BaseModel):
-    business_id: str
+    # 🔒 Removed business_id. The frontend should only send the message.
     message: str
 
 class ChatResponse(BaseModel):
@@ -25,17 +25,18 @@ class ChatResponse(BaseModel):
 def chat_with_azasabi(
     chat_in: ChatRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user) # 🛡️ The Bouncer validates the token
 ):
     total_start = time.time()
     
+    # 🔒 The IDOR Fix: Find the business exclusively by checking who the user is in the database.
+    # No more trusting the frontend to tell us which business to log data to.
     business = db.query(Business).filter(
-        Business.id == chat_in.business_id,
         Business.owner_id == current_user.id
     ).first()
     
     if not business:
-        raise HTTPException(status_code=403, detail="Not authorized for this business.")
+        raise HTTPException(status_code=403, detail="No business profile found for this user. Please create one first.")
         
     db_start = time.time()
     # 1. Fetch the last 10 messages for context
@@ -55,13 +56,11 @@ def chat_with_azasabi(
     try:
         response = process_chat_message(chat_in.message, history)
     except Exception as e:
-        # If the error contains "503" or "UNAVAILABLE", handle it gracefully
         if "503" in str(e) or "UNAVAILABLE" in str(e):
             return ChatResponse(
                 reply="My servers are a bit overwhelmed right now! Give me just a few seconds and try sending that again.", 
                 extracted_data=None
             )
-        # For any other unexpected error, return a generic safe message
         print(f"AI Error: {e}")
         return ChatResponse(
             reply="I ran into a small glitch. Could you try again?", 
@@ -69,10 +68,8 @@ def chat_with_azasabi(
         )
     print(f"⏱️ Gemini AI Took: {time.time() - ai_start:.2f} seconds")
     
-    # --- CRITICAL FIX: Define defaults before checking the AI response ---
     reply_text = "I am not sure how to respond to that."
     extracted = None
-    # --------------------------------------------------------------------
     
     # 4. Handle Tool Calls (Sales Logging)
     if response.function_calls:
